@@ -1,0 +1,94 @@
+Task 4: Operation Identification and Operation Schema
+An operation is an action performed by the system. A state describes a condition; an operation changes data, checks conditions, sends alerts, or controls equipment.
+4.1 Identification of 12 operations
+Operation ID	Operation name	Purpose
+OP-01	InitializeRobot	Starts the robot and checks basic readiness.
+OP-02	ValidateDeliveryRequest	Checks request details and destination validity.
+OP-03	AuthorizeCommand	Verifies operator identity, role, and command permission.
+OP-04	HandleObstacle	Detects obstacles, suspends navigation, and verifies safe avoidance.
+OP-05	VerifyDelivery	Confirms destination arrival, chamber readiness, and delivery eligibility.
+OP-06	HandleCriticalBattery	Evaluates battery capacity and selects the approved safe response.
+OP-07	EnterSafeMode	Applies protective actions when a critical trigger is detected.
+OP-08	StartConservation	Loads a medicine profile and starts conservation when conditions are safe.
+OP-09	CorrectEnvironment	Corrects temperature/humidity and verifies recovery using sensors.
+OP-10	HandleLinkLoss	Detects loss of remote communication and activates local safety policy.
+OP-11	VerifyChamberDoor	Detects door status and suspends or permits chamber operation accordingly.
+OP-12	HandlePowerFailure	Switches to emergency power or safely records and shuts down.
+4.2 Operation schemas
+OP-03: AuthorizeCommand
+- Description: Checks whether a remote command is permitted.
+- Inputs: Operator ID, credentials/session token, role, command, robot ID.
+- Outputs: Accepted or rejected decision.
+- Reads: Operator account, role permissions, robot status, command policy.
+- Changes: Records the authorization result; updates command status.
+- Sends/Alerts: Sends acceptance or rejection to Mission Control.
+- Assumes (precondition): A command has been received and its format can be parsed.
+- Result (postcondition): The command is accepted only if the operator is authenticated, has the required role, and the requested action is safe in the current robot state. Rejected commands cause no protected physical action.
+OP-04: HandleObstacle
+- Description: Handles an obstacle encountered during navigation.
+- Inputs: Obstacle sensor readings, robot location, planned route.
+- Outputs: Avoidance decision and updated route.
+- Reads: Navigation state, obstacle distance, route map, safety limits.
+- Changes: Suspends normal navigation and updates route progress.
+- Sends/Alerts: Reports obstacle detection and avoidance result.
+- Assumes (precondition): Obstacle sensors are operational and the robot is navigating.
+- Result (postcondition): The robot resumes navigation only after the obstacle is cleared and the route is verified safe; otherwise, it follows a protective response.
+OP-07: EnterSafeMode
+- Description: Activates protective behaviour after a critical condition.
+- Inputs: Critical battery status, chamber/battery temperatures, fault flags, timestamp.
+- Outputs: Safe Mode status and protective action result.
+- Reads: Safety thresholds, robot state, battery readings, chamber readings.
+- Changes: Sets the safety state, suspends unsafe actions, and blocks incompatible commands.
+- Sends/Alerts: Sends a critical alert to Mission Control and records the event.
+- Assumes (precondition): A critical trigger is detected by the onboard safety monitor.
+- Result (postcondition): The robot enters Safe Mode within 3 seconds for CR-01 triggers. The safety event is logged and normal operations cannot resume until recovery checks pass.
+OP-08: StartConservation
+- Description: Starts controlled storage for a medicine batch.
+- Inputs: Batch ID, temperature limits, humidity limits, door status, sensor health.
+- Outputs: Conservation-start result.
+- Reads: Batch profile, sensor health, temperature, humidity, door status, power availability.
+- Changes: Loads the profile and enables environmental control.
+- Sends/Alerts: Records the batch and conservation-start event.
+- Assumes (precondition): The batch is identified, essential sensors pass self-check, and the required profile is available.
+- Result (postcondition): Conservation starts only when the profile is loaded, the door is closed, and sensors are healthy. Otherwise, conservation remains inactive and an error is reported.
+OP-09: CorrectEnvironment
+- Description: Restores temperature or humidity to the approved batch range.
+- Inputs: Current temperature/humidity, target limits, recovery deadline.
+- Outputs: Verified recovery result or correction-failure result.
+- Reads: Environmental sensors, batch profile, correction actuator status, recovery timer.
+- Changes: Adjusts cooling/heating or humidity-control equipment and records recovery progress.
+- Sends/Alerts: Reports successful correction or raises a protection alert.
+- Assumes (precondition): The batch profile is loaded, sensors are operational, and the required correction equipment is available.
+- Result (postcondition): Recovery is declared successful only after sensor readings confirm that the values are within their permitted ranges. If the recovery period expires without success, the chamber enters protection mode and reduces light exposure.
+OP-11: VerifyChamberDoor
+- Description: Checks whether the chamber door is closed and safe for conservation.
+- Inputs: Door sensor reading, chamber mode, sensor status.
+- Outputs: Door-safe or door-open result.
+- Reads: Door sensor, environmental conditions, current chamber operation.
+- Changes: Suspends normal conservation when the door opens and initiates re-verification when it closes.
+- Sends/Alerts: Logs door opening and closing; alerts the operator when necessary.
+- Assumes (precondition): Door-status sensors are available and their readings are validated.
+- Result (postcondition): Normal conservation remains suspended while the door is open and resumes only after the door is closed and environmental conditions and sensors are verified.
+OP-12: HandlePowerFailure
+- Description: Manages loss of the chamber's main power.
+- Inputs: Power-failure signal, emergency-power availability, current chamber state.
+- Outputs: Emergency-power activation or safe-shutdown result.
+- Reads: Power status, backup capacity, batch conditions, fault history.
+- Changes: Switches to emergency power when available; otherwise, executes safe shutdown and records the incident.
+- Sends/Alerts: Alerts Mission Control and records the power incident.
+- Assumes (precondition): Power monitoring is active and the backup-power status can be checked.
+- Result (postcondition): If emergency power is available, the chamber switches to it. Otherwise, the incident is recorded and the chamber shuts down safely.
+4.3 How operations change the chamber state
+For this table, the chamber has a separate state model because chamber conservation is not identical to robot navigation.
+Chamber state	Event / operation	Next chamber state	Effect on robot model
+MONITORING	OP-08: StartConservation; profile loaded and door closed	CONSERVING	Robot may continue its permitted mission if other safety checks pass.
+CONSERVING	OP-11: VerifyChamberDoor detects DoorOpened	DOOR_OPEN_SUSPENDED	Robot must not perform a delivery action that requires a closed chamber door.
+CORRECTING	OP-09: Recovery deadline expires without verified recovery	PROTECTION_MODE	Robot receives a chamber-fault alert and follows the approved safety policy.
+CONSERVING	OP-12: Main power fails, backup available	EMERGENCY_POWER	Robot monitors chamber status and follows its approved mission policy.
+EMERGENCY_POWER	Backup power unavailable or exhausted	SAFE_SHUTDOWN	Robot must not treat the batch as safe for delivery without verification.
+Link to Task 3: A critical chamber fault can trigger ST-06 SAFE_MODE in the robot state model. Opening the chamber door does not automatically mean the robot is in Safe Mode, but it suspends chamber conservation and blocks any delivery operation that violates the safety constraints.
+4.4 Operations requiring sensor verification
+Two particularly important examples are:
+1. OP-09: CorrectEnvironment. Sending a cooling or humidity-control command does not prove the target has been reached. Sensor readings must confirm that temperature and humidity are within the batch's specified limits.
+2. OP-11: VerifyChamberDoor. Sending a close-door command does not prove the door is physically closed. The door sensor must confirm closure, and environmental conditions and sensor health must be rechecked before conservation resumes.
+A third example is railway crossing clearance: a barrier-open command is not evidence that the barrier is physically open or that no train is approaching.
