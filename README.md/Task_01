@@ -1,0 +1,29 @@
+# SV-V-LAB6
+Task 1: Requirement Extraction
+1.1 Functional Requirements (FRs)
+Req. ID	Requirement	Type	Priority	Verification Method
+FR-01	The system shall initialize each robot in IDLE when switched on.	FR	High	State transition test
+FR-02	The robot shall accept a delivery request only after validating the request and destination.	FR	High	Functional test
+FR-03	The system shall authenticate an operator and verify their role before accepting a command.	FR	Critical	Security test
+FR-04	The robot shall detect obstacles, suspend navigation, avoid the obstacle, and resume its route when safe.	FR	Critical	Simulation test
+FR-05	The robot shall deliver a package only after reaching its assigned destination and confirming delivery conditions.	FR	High	Integration test
+FR-06	The robot shall abandon its delivery and return to the warehouse when its battery reaches the emergency level.	FR	Critical	Battery fault-injection test
+FR-07	The chamber shall check essential sensors at power-on and enable monitoring only if all required sensors pass.	FR	Critical	Sensor fault-injection test
+FR-08	The chamber shall load the batch identity and temperature/humidity limits and begin conservation only when the profile is loaded and the door is closed.	FR	Critical	Chamber integration test
+FR-09	The chamber shall correct out-of-range temperature or humidity and verify recovery through sensor readings.	FR	Critical	Environmental simulation test
+FR-10	The system shall record robot events, command outcomes, chamber faults, and safety incidents with timestamps.	FR	High	Log inspection test
+1.2 Non-Functional Requirements (NFRs)
+These requirements include proposed measurable targets because the scenario does not specify exact performance limits. They should be approved by the health authority before the baseline is finalized.
+Req. ID	Requirement	Type	Priority	Verification Method
+NFR-01	The robot shall enter Safe Mode within 3 seconds of detecting a defined critical battery or chamber/battery temperature condition.	NFR / Safety	Critical	Timed fault-injection test
+NFR-02	The system shall support at least 20 robots connected to Mission Control simultaneously.	NFR	High	Load test
+NFR-03	The system shall reject 100% of commands that lack valid authentication or required role authorization.	NFR / Security	Critical	Penetration and access-control tests
+NFR-04	Under the specified pilot workload, 95% of telemetry messages shall be processed within 5 seconds of receipt by Mission Control.	NFR / Performance	High	Performance test
+NFR-05	The portal shall provide searchable robot, operator, and project-artefact records, with 95% of searches returning results within 2 seconds under the pilot workload.	NFR / Usability	Medium	Usability and response-time test
+Note: The 5-second telemetry and 2-second portal targets are proposed engineering targets, not facts given in the scenario. The low-bandwidth link has delays of several seconds, so end-to-end delivery time must be measured separately.
+1.3 High-Risk Requirements
+Req. ID	High-risk requirement	Type	Priority	Verification Method
+SAFE-01	The robot shall enter Safe Mode within 3 seconds when a critical chamber/battery temperature threshold is exceeded or battery capacity falls below the emergency level.	Safety	Critical	Timed fault-injection test
+SAFE-02	The robot shall never enter a railway crossing unless the barrier is confirmed open, no train is approaching, and crossing-related safety signals are valid.	Safety	Critical	Hardware-in-the-loop simulation
+SAFE-03	If the command/telemetry link is lost, the robot shall stop accepting new remote commands and execute a predefined local safe-response policy.	Safety	Critical	Communication-loss test
+SAFE-04	The chamber shall suspend normal conservation when the door opens or critical environmental recovery fails, and shall prevent batch removal until safe conditions are verified.	Safety	Critical	Chamber safety t
