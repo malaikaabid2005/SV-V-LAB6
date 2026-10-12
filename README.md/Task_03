@@ -1,0 +1,68 @@
+Task 3: State Modelling and Transition Verification
+3.1 State definitions
+A state describes what the robot is currently doing. An event is something that happens and may cause a change of state.
+For example, NAVIGATING is a state, whereas ObstacleDetected is an event.
+State ID	State	Meaning	Entry condition	Exit condition
+ST-00	OFF	Robot is powered off.	Power is off.	Power-on signal.
+ST-01	IDLE	Robot waits for a valid delivery request.	Startup completed or robot returned to warehouse.	Valid request or shutdown.
+ST-02	NAVIGATING	Robot travels to its destination.	Valid delivery request accepted.	Obstacle, destination reached, critical battery, or safety fault.
+ST-03	AVOIDING_OBSTACLE	Robot suspends normal navigation to handle an obstacle.	Obstacle detected during navigation.	Obstacle cleared and route verified, or safety fault.
+ST-04	DELIVERING	Robot performs the delivery.	Destination reached and delivery conditions verified.	Delivery completed or a safety fault.
+ST-05	RETURNING	Robot travels back to the warehouse.	Delivery completed, or delivery abandoned due to critical battery.	Warehouse reached or safety fault.
+ST-06	SAFE_MODE	Robot performs its defined protective actions.	Critical battery/thermal condition or another defined critical fault.	Fault cleared and recovery checks passed.
+ST-07	LINK_LOST	Remote communication is unavailable.	Communication timeout or link-loss detection.	Link restored and communication integrity verified.
+Design assumption: SAFE_MODE and LINK_LOST are protective states that take precedence over normal activities. If both conditions occur, Safe Mode takes priority, while the link-loss condition remains recorded. The exact recovery policy must be approved by the safety authority.
+3.2 Events and conditions
+Event ID	Event	Meaning
+EV-01	PowerOn	Robot receives a startup signal.
+EV-02	DeliveryRequest	A delivery request is submitted.
+EV-03	RequestValidated	Request and destination pass validation.
+EV-04	ObstacleDetected	An obstacle is detected in the route.
+EV-05	ObstacleCleared	The obstacle is cleared and the route is confirmed safe.
+EV-06	DestinationReached	Robot reaches the assigned destination.
+EV-07	DeliveryCompleted	Delivery is confirmed complete.
+EV-08	WarehouseReached	Robot reaches the warehouse.
+EV-09	CriticalBattery	Battery capacity falls below the emergency threshold.
+EV-10	CriticalThermal	A chamber or battery temperature exceeds its critical threshold.
+EV-11	LinkTimeout	The remote link is declared lost.
+EV-12	LinkRestored	The remote link returns and is verified.
+EV-13	FaultCleared	The critical fault is cleared and recovery checks pass.
+EV-14	DoorOpened	The conservation chamber door opens.
+EV-15	SensorFailure	An essential sensor fails.
+3.3 State transition table
+A valid transition is permitted by the specified model. An invalid transition must be rejected or prevented by the controller.
+Transition ID	Current state + event	Next state	Req. ID	Valid?	Verification evidence
+TR-01	OFF + PowerOn	IDLE	FR-01	Yes	TC-01
+TR-02	IDLE + ValidatedDeliveryRequest	NAVIGATING	FR-02	Yes	TC-02
+TR-03	IDLE + DeliveryRequest without validation	IDLE	FR-02	Yes, reject request	TC-02
+TR-04	NAVIGATING + ObstacleDetected	AVOIDING_OBSTACLE	FR-04	Yes	TC-05
+TR-05	AVOIDING_OBSTACLE + ObstacleCleared and route verified	NAVIGATING	FR-04	Yes	TC-05
+TR-06	NAVIGATING + DestinationReached and delivery conditions verified	DELIVERING	FR-05	Yes	TC-06
+TR-07	DELIVERING + DeliveryCompleted	RETURNING	FR-05	Yes	Delivery integration test
+TR-08	RETURNING + WarehouseReached	IDLE	FR-01	Yes	Return-to-warehouse test
+TR-09	NAVIGATING + CriticalBattery	RETURNING	FR-06	Yes, if return is safe	TC-07
+TR-10	NAVIGATING + CriticalThermal or critical battery trigger	SAFE_MODE	SAFE-01	Yes	TC-08
+TR-11	NAVIGATING + LinkTimeout	LINK_LOST	SAFE-03	Yes	TC-10
+TR-12	LINK_LOST + LinkRestored and integrity verified	Previous safe operational state	SAFE-03	Conditional	Communication recovery test
+TR-13	Any active state + critical safety trigger	SAFE_MODE	SAFE-01	Yes	TC-08
+TR-14	AVOIDING_OBSTACLE + CriticalBattery	RETURNING or SAFE_MODE	FR-06 / SAFE-01	Conditional	Fault-injection test
+TR-15	DELIVERING + CriticalBattery or CriticalThermal	SAFE_MODE or protective delivery suspension	SAFE-01	Yes	Fault-injection test
+TR-16	IDLE + direct Deliver command	IDLE; reject command	FR-05	Yes, rejection required	Negative transition test
+TR-17	AVOIDING_OBSTACLE + Deliver command	AVOIDING_OBSTACLE; reject command	FR-04 / FR-05	Yes, rejection required	Negative transition test
+Important modelling note: The original scenario says a critically low battery during navigation causes the robot to return. CR-01 additionally requires Safe Mode for battery capacity below the emergency level. The design must define whether this emergency threshold is the same as, or lower than, the critical-return threshold. If the battery is too low for safe return, the robot must use its emergency protective policy rather than blindly attempt to return.
+3.4 Extended safety transitions
+The robot can enter SAFE_MODE from IDLE, NAVIGATING, AVOIDING_OBSTACLE, DELIVERING, RETURNING, and LINK_LOST whenever a defined critical trigger occurs.
+The robot can enter LINK_LOST from any state that depends on the remote communication link. On link loss, local collision avoidance and other onboard safety functions must continue working.
+Recovery must not automatically resume the last activity. It must first verify the fault condition, battery and thermal safety, route safety, chamber condition, and communication integrity as applicable.
+3.5 Behavioural verification
+(a) Can IDLE → DELIVERING happen?
+No. It violates FR-05 and the state model because the robot must validate the delivery request, navigate to the destination, and verify delivery conditions before delivering. The controller must reject this transition.
+(b) What if AVOIDING_OBSTACLE has no transition back?
+The robot may become permanently stuck in obstacle avoidance. This is a liveness failure: it cannot resume navigation or complete the delivery. Add a transition when the obstacle is cleared and the route is verified, plus a timeout/fault response if avoidance cannot be completed.
+(c) Can AVOIDING_OBSTACLE → DELIVERING occur?
+No, not directly. It violates the rule that delivery must occur only after the destination is reached and delivery conditions are verified. The correct path is AVOIDING_OBSTACLE → NAVIGATING → DELIVERING.
+(d) What happens on CriticalBattery during AVOIDING_OBSTACLE or DELIVERING?
+If no transition is defined, the state model has a missing safety transition.
+- During AVOIDING_OBSTACLE, the robot must not resume normal navigation blindly. It must follow a verified safe-return route or enter Safe Mode if the emergency condition requires it.
+- During DELIVERING, the robot must suspend unsafe delivery activity and enter the specified protective response. Under CR-01, the defined emergency battery trigger requires Safe Mode within 3 seconds.
+The model should explicitly test these cases, not merely check whether the transition table is complete.
