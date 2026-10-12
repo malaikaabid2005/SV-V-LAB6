@@ -1,0 +1,111 @@
+Task 5: Constraints, Formalisation and Violations — Railway Crossing
+5.1 Ten safety constraints
+For this task, assume the following Boolean variables are monitored:
+- Train_Present: a train is detected or approaching.
+- Barrier_Open, Barrier_Closed: confirmed physical barrier positions.
+- Robot_In_Crossing: robot is physically within the railway crossing.
+- Crossing_Clear: crossing is confirmed clear of the train.
+- Sensor_Failure: one or more essential railway sensors have failed.
+- Link_Lost: required railway communication link is lost.
+- Chamber_Door_Open: chamber door is open.
+- Robot_Delivering: robot is performing a delivery.
+- Safe_Mode: robot is in protective mode.
+- Sensors_Valid: relevant safety sensors are healthy and their readings are valid.
+The constraints are evaluated using validated, current observations. A stale or unknown signal must not be treated as proof of safety.
+Constraint ID	Constraint in simple English	Why it is necessary
+C-01	If a train is present or approaching, the barrier must not be open.	Prevents train–robot collisions.
+C-02	The robot may enter the crossing only if the barrier is confirmed open, no train is approaching, and safety sensors are valid.	Prevents unsafe crossing entry.
+C-03	The barrier must remain closed while a train is passing.	Protects the crossing during train movement.
+C-04	The barrier may open after train passage only when the crossing is confirmed clear and sensor readings are valid.	Prevents premature opening.
+C-05	If an essential railway sensor fails, the robot must not enter the crossing and the system must raise an alert.	Prevents reliance on incorrect or missing readings.
+C-06	If the railway communication link is lost, the robot must not begin crossing unless a valid, independently approved local safety policy confirms it is safe.	Prevents unsafe decisions based on stale information.
+C-07	The robot must not deliver while the chamber door is open.	Prevents unsafe handling of temperature-sensitive medicines.
+C-08	The robot must not deliver when the chamber is in protection mode or its required environmental conditions are unverified.	Protects medicine quality.
+C-09	The robot must enter Safe Mode within 3 seconds of a defined critical battery or chamber/battery temperature trigger.	Enforces CR-01.
+C-10	Significant vibration must suspend risky chamber activities until vibration stays below the threshold for the required stabilisation period.	Prevents damage to sensitive medicines and unreliable readings.
+5.2 Formalisation of constraints
+The symbols mean:
+- \(\land\) = AND
+- \(\lor\) = OR
+- \(\neg\) = NOT
+- \(\rightarrow\) = implies / if … then
+Constraint ID	Formal expression
+C-01	\(Train\_Present \rightarrow \neg Barrier\_Open\)
+C-02	\(Robot\_Enter \rightarrow (Barrier\_Open \land \neg Train\_Present \land Sensors\_Valid)\)
+C-03	\(Train\_Passing \rightarrow Barrier\_Closed\)
+C-04	\(Barrier\_Open \rightarrow (Crossing\_Clear \land Sensors\_Valid)\)
+C-05	\(Sensor\_Failure \rightarrow (\neg Robot\_Enter \land Alert)\)
+C-06	\(Link\_Lost \rightarrow \neg Robot\_Enter\)
+C-07	\(Chamber\_Door\_Open \rightarrow \neg Robot\_Delivering\)
+C-08	\((Chamber\_Protection \lor \neg Environmental\_Conditions\_Verified) \rightarrow \neg Robot\_Delivering\)
+C-09	\(Critical\_Trigger \rightarrow (Safe\_Mode\_Within\_3s)\)
+C-10	\(Vibration\_High \rightarrow \neg Risky\_Chamber\_Activity\)
+Interpretation: C-02 is an entry guard. The robot cannot enter just because the barrier appears open; the no-train condition and valid sensors must also be established. C-04 additionally ensures that the barrier-open state is supported by a verified clear crossing.
+In an actual implementation, C-01 and C-03 should be represented with appropriate time-aware safety logic and fail-safe handling, rather than relying on a single instantaneous sensor sample.
+5.3 Eight realistic constraint violations
+A violation occurs when the observed values make a constraint false. The system must detect the violation and perform the defined safe response.
+Violation ID	Constraint	Variable values causing violation	Detection method	Expected response
+V-01	C-01	Train_Present=TRUE, Barrier_Open=TRUE	Train sensor and barrier-position feedback conflict with safety rules.	Command/maintain barrier closure, raise alarm, stop robot entry, and log event.
+V-02	C-02	Robot_Enter=TRUE, Barrier_Open=FALSE, Train_Present=FALSE, Sensors_Valid=TRUE	Crossing-entry guard detects a closed barrier.	Reject entry and stop the robot before the crossing.
+V-03	C-03	Train_Passing=TRUE, Barrier_Closed=FALSE	Train sensor and barrier-position feedback.	Raise a critical alarm, command closure if possible, prevent robot entry, and activate railway safety procedures.
+V-04	C-04	Barrier_Open=TRUE, Crossing_Clear=FALSE, Sensors_Valid=TRUE	Crossing-clearance sensor disagrees with the open-barrier condition.	Close the barrier if safe and technically possible, alert the operator, and log the incident.
+V-05	C-05	Sensor_Failure=TRUE, Robot_Enter=TRUE, Alert=FALSE	Sensor diagnostics and entry-monitor checks.	Block crossing entry, enter the railway system's protective mode, alert the operator, and log the failure.
+V-06	C-06	Link_Lost=TRUE, Robot_Enter=TRUE	Link heartbeat timeout and crossing-entry monitor.	Stop entry, apply the local safe-response policy, and record the communication loss.
+V-07	C-07	Chamber_Door_Open=TRUE, Robot_Delivering=TRUE	Door sensor and delivery-state monitor.	Suspend delivery, secure the batch, alert the operator, and log the violation.
+V-08	C-08	Chamber_Protection=TRUE, Robot_Delivering=TRUE, Environmental_Conditions_Verified=FALSE	Chamber-state and environmental-condition monitor.	Stop delivery, maintain protection measures, notify Mission Control, and log the event.
+Additional timing and vibration violation examples
+Violation ID	Constraint	Variable values	Expected response
+V-09	C-09	Critical_Trigger=TRUE, Safe_Mode_Within_3s=FALSE	Flag a critical timing failure, activate the available independent protective mechanism, alert Mission Control, and log the missed deadline.
+V-10	C-10	Vibration_High=TRUE, Risky_Chamber_Activity=TRUE	Suspend risky activities, alert the operator if necessary, and resume only after the vibration remains below threshold for the stabilisation period.
+These examples provide observable inputs and expected outcomes, so each violation can be reproduced during testing.
+5.4 How the system should detect violations
+The combined SACDCS and ARLCCS design should use three levels of checking:
+1. Preventive checks: Before accepting an action, check whether the preconditions are satisfied. For example, the robot cannot enter a crossing while the barrier is closed.
+2. Continuous monitoring: Monitor train detection, barrier position, communication health, chamber door status, temperature, humidity, and vibration during operation.
+3. Fault response and logging: If a violation or critical fault is detected, execute the appropriate protective action, alert Mission Control, and record the observed values and timestamps.
+An alarm alone is not sufficient when a physical hazard exists. The controller must also prevent or stop the unsafe action wherever technically possible.
+
+Final verification checklist
+Use this checklist before submitting the assignment.
+Assignment progress
+0 of 8
+
+
+
+[ ] 10 functional requirements and 5 measurable NFRs
+Task 1
+
+[ ] 4 high-risk requirements with verification methods
+Task 1
+
+[ ] 3 change requests with old/new wording and reasons
+Task 2
+
+[ ] Multi-layer RTM and 10 traceable test cases
+Task 2
+
+[ ] Robot states, events, valid and invalid transitions
+Task 3
+
+[ ] Safe Mode, Link Lost and missing-transition analysis
+Task 3
+
+[ ] 12 operations and 6 complete operation schemas
+Task 4
+
+[ ] 10 constraints, 10 formal expressions and violation scenarios
+Task 5
+
+
+
+
+
+
+
+
+
+
+
+
+
+Is this conversation helpful so far?
