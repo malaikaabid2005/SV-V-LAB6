@@ -1,0 +1,50 @@
+Task 2: Change Requests and Traceability Matrix (RTM)
+2.1 Version-controlled change log
+Assume the approved baseline is version 1.0, and the updated version is 1.1.
+CR ID	Requirement ID	Old requirement	New requirement	Reason	Status
+CR-01	SAFE-01	The robot shall enter Safe Mode when a critical battery or thermal condition is detected.	The robot shall enter Safe Mode within 3 seconds when chamber or battery temperature exceeds the critical threshold or battery capacity falls below the emergency level.	Adds measurable timing and explicit triggering conditions.	Modified
+CR-02	NFR-02	The system shall support communication with multiple robots simultaneously.	The system shall support at least 20 simultaneously connected robots.	Defines a minimum capacity that can be tested.	Modified
+CR-03	FR-03	Only authenticated operators shall be permitted to issue robot commands.	The system shall require authenticated and role-authorised operators before accepting any robot command.	Requires both identity verification and permission verification.	Modified
+Why the new wording is better
+- CR-01: A test engineer can measure the time between critical-condition detection and Safe Mode entry. The limit is 3 seconds.
+- CR-02: A load test can connect 20 robots simultaneously and verify that all can maintain supported communication.
+- CR-03: Tests can cover unauthenticated users, authenticated users with insufficient permissions, and authenticated users with the correct role.
+2.2 Requirement-to-test traceability
+The following IDs are used throughout the RTM:
+- State transitions: TR-01 to TR-12
+- Operations: OP-01 to OP-12
+- Constraints: C-01 to C-10
+- Test cases: TC-01 to TC-10
+The traceability chain is:
+Requirement → State/Transition → Operation → Constraint → Test Case → Risk Level
+Req. ID	State/Transition	Operation	Constraint	Test Case	Risk
+FR-01	TR-01: OFF → IDLE	OP-01: InitializeRobot	C-01	TC-01	Medium
+FR-02	TR-02: IDLE → NAVIGATING	OP-02: ValidateDeliveryRequest	C-02	TC-02	High
+FR-03 / CR-03	TR-03: COMMAND_RECEIVED → ACCEPTED/REJECTED	OP-03: AuthorizeCommand	C-03	TC-03, TC-04	Critical
+FR-04	TR-04: NAVIGATING → AVOIDING_OBSTACLE	OP-04: HandleObstacle	C-04	TC-05	Critical
+FR-05	TR-05: NAVIGATING → DELIVERING	OP-05: VerifyDelivery	C-05	TC-06	High
+FR-06	TR-06: NAVIGATING → RETURNING	OP-06: HandleCriticalBattery	C-06	TC-07	Critical
+SAFE-01 / CR-01	TR-07: ANY_ACTIVE → SAFE_MODE	OP-07: EnterSafeMode	C-07	TC-08	Critical
+FR-08	TR-08: PROFILE_LOADED + DOOR_CLOSED → CONSERVING	OP-08: StartConservation	C-08	TC-09	Critical
+FR-09	TR-09: CORRECTION → VERIFIED_RECOVERY/PROTECTION	OP-09: CorrectEnvironment	C-09	TC-09	Critical
+SAFE-03	TR-10: ACTIVE → LINK_LOST	OP-10: HandleLinkLoss	C-10	TC-10	Critical
+These links are the baseline traceability structure. The full transition table, operation schemas, constraints, and tests below supply the detailed evidence behind each link.
+2.3 Test cases
+Precondition: tests run in a controlled test environment with simulated robots, chamber sensors, and railway signals where appropriate.
+Test ID	Steps / Input	Expected result	CR retest
+TC-01	Power on a robot.	Robot enters IDLE and records initialization.	None
+TC-02	Submit a valid delivery request while IDLE.	Request is validated and the robot enters NAVIGATING.	None
+TC-03	Send a command without authentication.	Command is rejected; no robot action occurs; event is logged.	CR-03
+TC-04	Authenticate an operator who lacks the required role, then try a command.	Command is rejected and logged.	CR-03
+TC-05	Inject an obstacle during navigation, then clear it.	Navigation suspends; obstacle is avoided; robot resumes navigation safely.	None
+TC-06	Simulate arrival at the destination.	Delivery begins only after destination and delivery conditions are verified.	None
+TC-07	Drop battery capacity below the emergency level during navigation.	Delivery is abandoned and the robot returns to the warehouse or enters the defined safer response if return is unsafe.	CR-01 regression
+TC-08	Trigger a critical chamber temperature, battery temperature, or emergency battery condition. Measure the time to Safe Mode.	Safe Mode is entered within 3 seconds; event is logged and alert sent.	CR-01
+TC-09	Introduce out-of-range chamber temperature, then simulate successful and failed correction.	Successful recovery is verified by sensors; failed recovery triggers protection and an alert.	None
+TC-10	Disconnect the remote link during active navigation.	Robot follows its local safe-response policy, rejects unsafe remote commands, and records the link-loss event.	None
+2.4 Retesting after change requests
+Change request	Tests to rerun	Additional regression tests
+CR-01	TC-07, TC-08	Test the 3-second deadline for all specified triggers and verify that obstacle handling and delivery cannot override Safe Mode.
+CR-02	A new load test, TC-11	Connect 20 robots simultaneously; verify communication, command routing, telemetry, and event logging.
+CR-03	TC-03, TC-04	Verify authorized commands still work and unauthorized commands cannot cause physical actions.
+CR-02 needs an additional test because 10 functional tests do not prove that the system can sustain 20 simultaneous robot connections.
